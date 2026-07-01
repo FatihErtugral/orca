@@ -14,10 +14,9 @@ public final class AgentStore: ObservableObject {
     private let now: () -> Date
     private let doneGrace: TimeInterval
     private let staleTTL: TimeInterval
-    private let transcriptActivity: (String) -> Date?
+    private let activity: TranscriptActivityTracking
     private let processAlive: (Int32) -> Bool
     private let waitingConfirmDelay: TimeInterval
-    private let activityWindow: TimeInterval
     private var pruneTimer: Timer?
 
     /// Waiting notifications held back until the transcript stays quiet, so a
@@ -31,20 +30,18 @@ public final class AgentStore: ObservableObject {
         now: @escaping () -> Date = Date.init,
         doneGrace: TimeInterval = 90,
         staleTTL: TimeInterval = 1800,
-        transcriptActivity: @escaping (String) -> Date? = SessionTitleRefresher.fileModificationDate,
+        activity: TranscriptActivityTracking = TranscriptActivityMonitor(),
         processAlive: @escaping (Int32) -> Bool = AgentStore.isProcessAlive,
-        waitingConfirmDelay: TimeInterval = 6,
-        activityWindow: TimeInterval = 30
+        waitingConfirmDelay: TimeInterval = 6
     ) {
         self.notifications = notifications
         self.preferences = preferences
         self.now = now
         self.doneGrace = doneGrace
         self.staleTTL = staleTTL
-        self.transcriptActivity = transcriptActivity
+        self.activity = activity
         self.processAlive = processAlive
         self.waitingConfirmDelay = waitingConfirmDelay
-        self.activityWindow = activityWindow
     }
 
     public static func isProcessAlive(_ pid: Int32) -> Bool {
@@ -88,9 +85,7 @@ public final class AgentStore: ObservableObject {
 
             if agent.status == .waiting,
                let path = agent.transcriptPath,
-               let modified = transcriptActivity(path),
-               modified.timeIntervalSince(agent.lastUpdate) > 1.5,
-               currentTime.timeIntervalSince(modified) < activityWindow {
+               let modified = activity.lastMeaningfulActivity(path) {
                 var revived = agent
                 revived.status = .running
                 revived.message = "Working…"
@@ -108,8 +103,10 @@ public final class AgentStore: ObservableObject {
                 continue
             }
             guard currentTime.timeIntervalSince(since) >= waitingConfirmDelay else { continue }
-            let lastWrite = agent.transcriptPath.flatMap(transcriptActivity) ?? .distantPast
-            if lastWrite.timeIntervalSince(since) <= 1.5 {
+            // The transcript was rebaselined when the stop arrived, so any
+            // meaningful record since then means Claude resumed — never notify.
+            let resumed = agent.transcriptPath.flatMap { activity.lastMeaningfulActivity($0) } != nil
+            if !resumed {
                 pendingWaiting.removeValue(forKey: id)
                 notify(agent)
             }
@@ -165,9 +162,11 @@ public final class AgentStore: ObservableObject {
         publish()
 
         guard previous != status else { return }
-        // Waiting on a session with a transcript is only announced once the
-        // transcript stays quiet (see evaluateHealth) — Claude may auto-resume.
-        if status == .waiting, agent.transcriptPath != nil {
+        // Waiting on a session with a transcript is only announced once no real
+        // work records follow the stop (see evaluateHealth) — Claude may
+        // auto-resume after background tasks.
+        if status == .waiting, let path = agent.transcriptPath {
+            activity.rebaseline(path)
             pendingWaiting[event.id] = timestamp
         } else {
             notify(agent)
@@ -211,6 +210,9 @@ public final class AgentStore: ObservableObject {
         map = map.filter { _, agent in
             let age = now.timeIntervalSince(agent.lastUpdate)
             if agent.status == .done || agent.status == .idle { return age < doneGrace }
+            // Agents with a pid are governed by process liveness (evaluateHealth),
+            // not by an arbitrary age cutoff — an idle-but-open session stays.
+            if agent.pid != nil { return true }
             return age < staleTTL
         }
         publish()

@@ -34,4 +34,17 @@ final class AgentStateStoreTests: XCTestCase {
         let dir = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("orca-missing-\(UUID().uuidString)")
         XCTAssertTrue(AgentStateStore(directory: dir).loadAll().isEmpty)
     }
+
+    func testPidLivenessOverridesAge() throws {
+        let dir = try makeDir()
+        try write(AgentEvent(id: "old-alive", source: "claude-code", status: "waiting", ts: 0, pid: 100), to: dir, name: "a")
+        try write(AgentEvent(id: "fresh-dead", source: "claude-code", status: "running",
+                             ts: Date().timeIntervalSince1970, pid: 200), to: dir, name: "b")
+        let loaded = AgentStateStore(directory: dir).loadAll(
+            maxAge: 1800,
+            now: Date(timeIntervalSince1970: 1_000_000),
+            processAlive: { $0 == 100 }
+        )
+        XCTAssertEqual(loaded.map(\.id), ["old-alive"])
+    }
 }

@@ -6,19 +6,28 @@ private final class NotificationSpy: NotificationScheduling {
     func schedule(title: String, body: String, sound: Bool) { scheduled.append((title, body, sound)) }
 }
 
+private final class ActivityStub: TranscriptActivityTracking {
+    var meaningful: Date?
+    private(set) var rebaselined: [String] = []
+    func rebaseline(_ path: String) {
+        rebaselined.append(path)
+        meaningful = nil
+    }
+    func lastMeaningfulActivity(_ path: String) -> Date? { meaningful }
+}
+
 final class SessionHealthTests: XCTestCase {
     private var currentTime = Date(timeIntervalSince1970: 10_000)
-    private var transcriptMTime: Date?
     private var alivePIDs: Set<Int32> = []
+    private let activity = ActivityStub()
 
     private func makeStore(spy: NotificationSpy = NotificationSpy()) -> AgentStore {
         AgentStore(
             notifications: spy,
             now: { self.currentTime },
-            transcriptActivity: { _ in self.transcriptMTime },
+            activity: activity,
             processAlive: { self.alivePIDs.contains($0) },
-            waitingConfirmDelay: 6,
-            activityWindow: 30
+            waitingConfirmDelay: 6
         )
     }
 
@@ -38,37 +47,38 @@ final class SessionHealthTests: XCTestCase {
         XCTAssertTrue(store.agents.isEmpty)
     }
 
-    func testWaitingWithActiveTranscriptRevivesToRunning() {
+    func testWaitingRebaselinesTranscript() {
         let store = makeStore()
         alivePIDs = [42]
         store.apply(claudeEvent("waiting", pid: 42))
-        XCTAssertEqual(store.agents.first?.status, .waiting)
+        XCTAssertEqual(activity.rebaselined, ["/t/x.jsonl"])
+    }
 
-        // Transcript written well after the stop event: Claude auto-resumed.
-        transcriptMTime = currentTime.addingTimeInterval(5)
-        currentTime = currentTime.addingTimeInterval(8)
+    func testMeaningfulActivityRevivesToRunning() {
+        let store = makeStore()
+        alivePIDs = [42]
+        store.apply(claudeEvent("waiting", pid: 42))
+
+        activity.meaningful = currentTime.addingTimeInterval(2)
         store.evaluateHealth()
 
         XCTAssertEqual(store.agents.first?.status, .running)
         XCTAssertEqual(store.agents.first?.message, "Working…")
     }
 
-    func testQuietTranscriptDoesNotRevive() {
+    func testNoActivityKeepsWaiting() {
         let store = makeStore()
         alivePIDs = [42]
-        transcriptMTime = currentTime.addingTimeInterval(-1)
         store.apply(claudeEvent("waiting", pid: 42))
         currentTime = currentTime.addingTimeInterval(10)
         store.evaluateHealth()
         XCTAssertEqual(store.agents.first?.status, .waiting)
     }
 
-    func testWaitingNotificationIsDebouncedUntilQuiet() {
+    func testWaitingNotificationReleasesAfterQuietDelay() {
         let spy = NotificationSpy()
         let store = makeStore(spy: spy)
         alivePIDs = [42]
-        transcriptMTime = currentTime.addingTimeInterval(-1)
-
         store.apply(claudeEvent("waiting", pid: 42))
         XCTAssertTrue(spy.scheduled.isEmpty)
 
@@ -90,7 +100,7 @@ final class SessionHealthTests: XCTestCase {
         alivePIDs = [42]
         store.apply(claudeEvent("waiting", pid: 42))
 
-        transcriptMTime = currentTime.addingTimeInterval(4)
+        activity.meaningful = currentTime.addingTimeInterval(2)
         currentTime = currentTime.addingTimeInterval(7)
         store.evaluateHealth()
 
@@ -100,6 +110,14 @@ final class SessionHealthTests: XCTestCase {
         currentTime = currentTime.addingTimeInterval(60)
         store.evaluateHealth()
         XCTAssertTrue(spy.scheduled.isEmpty)
+    }
+
+    func testLivePidSurvivesStaleTTLPrune() {
+        let store = makeStore()
+        alivePIDs = [42]
+        store.apply(claudeEvent("waiting", pid: 42))
+        store.prune(now: currentTime.addingTimeInterval(7200))
+        XCTAssertEqual(store.agents.count, 1)
     }
 
     func testNonTranscriptSourcesNotifyImmediately() {

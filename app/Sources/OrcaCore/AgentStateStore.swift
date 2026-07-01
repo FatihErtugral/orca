@@ -16,8 +16,14 @@ public struct AgentStateStore {
             .appendingPathComponent("Library/Application Support/Orca/agents", isDirectory: true)
     }
 
-    /// Loads persisted events, dropping (and deleting) anything older than `maxAge`.
-    public func loadAll(maxAge: TimeInterval = 1800, now: Date = Date()) -> [AgentEvent] {
+    /// Loads persisted open-session events. Events carrying a pid are kept
+    /// exactly as long as that process is alive; `maxAge` is only the fallback
+    /// for events from sources that have no pid.
+    public func loadAll(
+        maxAge: TimeInterval = 1800,
+        now: Date = Date(),
+        processAlive: (Int32) -> Bool = AgentStore.isProcessAlive
+    ) -> [AgentEvent] {
         let files = (try? FileManager.default.contentsOfDirectory(
             at: directory, includingPropertiesForKeys: nil
         )) ?? []
@@ -29,7 +35,13 @@ public struct AgentStateStore {
                 let event = try? JSONDecoder().decode(AgentEvent.self, from: data)
             else { continue }
 
-            if let ts = event.ts, now.timeIntervalSince1970 - ts > maxAge {
+            let stale: Bool
+            if let pid = event.pid {
+                stale = !processAlive(pid)
+            } else {
+                stale = event.ts.map { now.timeIntervalSince1970 - $0 > maxAge } ?? true
+            }
+            if stale {
                 try? FileManager.default.removeItem(at: file)
                 continue
             }
