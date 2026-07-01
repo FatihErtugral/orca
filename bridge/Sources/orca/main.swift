@@ -187,6 +187,11 @@ func runUpdate(_ args: [String]) -> Int32 {
     run("/bin/cp", ["\(tmp)/orca", cliDest])
     run("/bin/chmod", ["+x", cliDest])
 
+    // Refresh the hook definitions with the NEW binary so hook-set changes
+    // (new events, message updates) reach settings.json, not just the binary.
+    print("==> Refreshing Claude Code hooks")
+    run(cliDest, ["install-hooks"])
+
     print("==> Relaunching Orca")
     run("/usr/bin/pkill", ["-f", "Orca.app/Contents/MacOS/Orca"])
     Thread.sleep(forTimeInterval: 0.6)
