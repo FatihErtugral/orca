@@ -14,25 +14,29 @@ multitasking across many sessions stops being a context-switching mess.
 
 ## Quick Start (install on another Mac)
 
-The repo is **private**, so downloads need GitHub auth via the `gh` CLI.
+The repo is **private**, so sign in to the GitHub CLI once:
 
 ```sh
-# 1. Install and sign in to the GitHub CLI (once)
 brew install gh          # or grab it from https://cli.github.com
 gh auth login
-
-# 2. Clone and install the prebuilt app — no Xcode needed
-gh repo clone FatihErtugral/orca
-cd orca
-./install.sh
 ```
 
-`install.sh` downloads the latest release, copies **Orca.app** to `/Applications`,
-clears the Gatekeeper quarantine, installs the `orca` CLI to `~/.local/bin`, adds
-the Claude Code hooks, and launches. Grant the notification prompt on first launch
-(and the Automation prompt the first time you click an agent to jump to its terminal).
+Then install with a **single command — no clone, no manual download** (works for
+anyone with repo access; uses your GitHub auth):
 
-Building from source instead (needs Xcode)? Run `./scripts/dev-install.sh`.
+```sh
+gh api repos/FatihErtugral/orca/contents/install.sh \
+  -H "Accept: application/vnd.github.raw" | bash
+```
+
+This fetches `install.sh` over your auth and runs it: downloads the latest
+**Orca.app** release, copies it to `/Applications`, clears the Gatekeeper
+quarantine, installs the `orca` CLI to `~/.local/bin`, adds the Claude Code hooks,
+and launches. Grant the notification prompt on first launch (and the Automation
+prompt the first time you click an agent to jump to its terminal).
+
+Alternatives: clone first with `gh repo clone FatihErtugral/orca && cd orca && ./install.sh`,
+or build from source (needs Xcode) with `./scripts/dev-install.sh`.
 
 ## Architecture
 
