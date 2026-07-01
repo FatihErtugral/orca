@@ -1,5 +1,6 @@
-import OrcaCore
+import AppKit
 import Foundation
+import OrcaCore
 import UserNotifications
 
 /// Concrete `NotificationScheduling` backed by UNUserNotificationCenter. Requires
@@ -7,6 +8,27 @@ import UserNotifications
 final class UserNotificationScheduler: NotificationScheduling {
     func requestAuthorization() {
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { _, _ in }
+    }
+
+    /// Called when the user re-enables notifications in settings. macOS never
+    /// re-prompts after a denial, so in that case open System Settings straight
+    /// to Orca's notification pane.
+    func ensurePermission() {
+        UNUserNotificationCenter.current().getNotificationSettings { settings in
+            switch settings.authorizationStatus {
+            case .notDetermined:
+                self.requestAuthorization()
+            case .denied:
+                DispatchQueue.main.async {
+                    let pane = "x-apple.systempreferences:com.apple.preference.notifications"
+                    let bundleId = Bundle.main.bundleIdentifier ?? "com.orca.app"
+                    let url = URL(string: "\(pane)?id=\(bundleId)")!
+                    NSWorkspace.shared.open(url)
+                }
+            default:
+                break
+            }
+        }
     }
 
     func schedule(title: String, body: String, sound: Bool) {

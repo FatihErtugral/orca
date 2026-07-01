@@ -8,6 +8,7 @@ struct MenuView: View {
     @State private var showSettings = false
     let onSelectAgent: (Agent) -> Void
     let onDismissAgent: (Agent) -> Void
+    let onNotificationsEnabled: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -68,17 +69,20 @@ struct MenuView: View {
     private var settings: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Notifications").font(.subheadline).fontWeight(.semibold)
-            Toggle("Enable notifications", isOn: $preferences.preferences.notificationsEnabled)
+            settingRow("Enable notifications", isOn: $preferences.preferences.notificationsEnabled)
+                .onChange(of: preferences.preferences.notificationsEnabled) { enabled in
+                    if enabled { onNotificationsEnabled() }
+                }
             Group {
-                Toggle("Waiting for input", isOn: $preferences.preferences.notifyOnWaiting)
-                Toggle("Finished", isOn: $preferences.preferences.notifyOnDone)
-                Toggle("Errors", isOn: $preferences.preferences.notifyOnError)
+                settingRow("Waiting for input", isOn: $preferences.preferences.notifyOnWaiting)
+                settingRow("Finished", isOn: $preferences.preferences.notifyOnDone)
+                settingRow("Errors", isOn: $preferences.preferences.notifyOnError)
             }
             .padding(.leading, 12)
             .disabled(!preferences.preferences.notificationsEnabled)
 
             Text("Sound").font(.subheadline).fontWeight(.semibold).padding(.top, 4)
-            Toggle("Play sound", isOn: $preferences.preferences.soundEnabled)
+            settingRow("Play sound", isOn: $preferences.preferences.soundEnabled)
                 .disabled(!preferences.preferences.notificationsEnabled)
 
             HStack {
@@ -95,10 +99,19 @@ struct MenuView: View {
             }
             .padding(.top, 6)
         }
-        .toggleStyle(.switch)
-        .controlSize(.mini)
         .font(.callout)
         .padding(.vertical, 4)
+    }
+
+    private func settingRow(_ title: String, isOn: Binding<Bool>) -> some View {
+        HStack {
+            Text(title)
+            Spacer()
+            Toggle("", isOn: isOn)
+                .labelsHidden()
+                .toggleStyle(.switch)
+                .controlSize(.mini)
+        }
     }
 
     @ViewBuilder

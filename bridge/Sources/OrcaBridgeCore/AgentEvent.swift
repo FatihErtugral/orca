@@ -14,6 +14,7 @@ public struct AgentEvent: Codable, Equatable {
     public var session: String?
     public var appBundleId: String?
     public var transcriptPath: String?
+    public var pid: Int32?
 
     public init(
         id: String,
@@ -27,7 +28,8 @@ public struct AgentEvent: Codable, Equatable {
         termProgram: String? = nil,
         session: String? = nil,
         appBundleId: String? = nil,
-        transcriptPath: String? = nil
+        transcriptPath: String? = nil,
+        pid: Int32? = nil
     ) {
         self.id = id
         self.source = source
@@ -41,6 +43,7 @@ public struct AgentEvent: Codable, Equatable {
         self.session = session
         self.appBundleId = appBundleId
         self.transcriptPath = transcriptPath
+        self.pid = pid
     }
 
     enum CodingKeys: String, CodingKey {
@@ -48,5 +51,6 @@ public struct AgentEvent: Codable, Equatable {
         case termProgram = "term_program"
         case appBundleId = "app_bundle_id"
         case transcriptPath = "transcript_path"
+        case pid
     }
 }

@@ -34,6 +34,19 @@ public struct SystemTerminalIdentity: TerminalIdentityResolving {
         )
     }
 
+    /// PID of the process that owns this session — the grandparent when invoked
+    /// from a hook (claude spawns `bash -c` which spawns us), otherwise the
+    /// shell's parent (the terminal). Used by the app for liveness checks.
+    public static func originatorPID() -> Int32 {
+        let parent = getppid()
+        var info = proc_bsdinfo()
+        let size = Int32(MemoryLayout<proc_bsdinfo>.size)
+        if proc_pidinfo(parent, PROC_PIDTBSDINFO, 0, &info, size) == size, info.pbi_ppid > 1 {
+            return Int32(info.pbi_ppid)
+        }
+        return parent
+    }
+
     /// Resolves the controlling terminal device (e.g. `/dev/ttys003`) via
     /// `proc_pidinfo`, which survives even when stdio are pipes (the hook case)
     /// and yields the concrete device name rather than `/dev/tty`.

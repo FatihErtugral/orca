@@ -34,6 +34,7 @@ public struct Agent: Identifiable, Equatable {
     public var session: String?
     public var appBundleId: String?
     public var transcriptPath: String?
+    public var pid: Int32?
 
     public init(
         id: String,
@@ -49,7 +50,8 @@ public struct Agent: Identifiable, Equatable {
         termProgram: String? = nil,
         session: String? = nil,
         appBundleId: String? = nil,
-        transcriptPath: String? = nil
+        transcriptPath: String? = nil,
+        pid: Int32? = nil
     ) {
         self.id = id
         self.source = source
@@ -65,6 +67,7 @@ public struct Agent: Identifiable, Equatable {
         self.session = session
         self.appBundleId = appBundleId
         self.transcriptPath = transcriptPath
+        self.pid = pid
     }
 
     /// Whether the agent is running or waiting (i.e. an open, live session).

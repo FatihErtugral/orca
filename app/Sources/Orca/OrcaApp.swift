@@ -33,7 +33,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
         notifier.requestAuthorization()
-        store.startPruning()
+        store.startMaintenance()
         titleRefresher.start(store: store)
         updateMonitor.start()
 
@@ -77,7 +77,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 onDismissAgent: { [weak self] agent in
                     self?.store.remove(id: agent.id)
                     self?.stateStore.remove(id: agent.id)
-                }
+                },
+                onNotificationsEnabled: { [notifier] in notifier.ensurePermission() }
             )
             .environmentObject(store)
             .environmentObject(preferencesStore)

@@ -8,10 +8,15 @@ func printError(_ message: String) {
     FileHandle.standardError.write(Data((message + "\n").utf8))
 }
 
-/// Claude Code hooks pipe a JSON payload on stdin; read it only when stdin is a
-/// pipe so interactive invocations don't block.
+/// Claude Code hooks pipe a JSON payload on stdin. Poll briefly instead of
+/// blocking so manual invocations with an open-but-silent stdin never hang.
 func readHookPayload() -> [String: Any]? {
-    guard isatty(FileHandle.standardInput.fileDescriptor) == 0 else { return nil }
+    let fd = FileHandle.standardInput.fileDescriptor
+    guard isatty(fd) == 0 else { return nil }
+
+    var pollFD = pollfd(fd: fd, events: Int16(POLLIN), revents: 0)
+    guard poll(&pollFD, 1, 300) > 0, pollFD.revents & Int16(POLLIN) != 0 else { return nil }
+
     let data = FileHandle.standardInput.readDataToEndOfFile()
     guard !data.isEmpty else { return nil }
     return (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]

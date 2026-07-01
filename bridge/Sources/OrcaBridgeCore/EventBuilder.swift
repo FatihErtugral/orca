@@ -77,6 +77,7 @@ public struct EventBuilder {
         event.termProgram = terminal.termProgram
         event.session = terminal.session
         event.appBundleId = terminal.appBundleId
+        event.pid = SystemTerminalIdentity.originatorPID()
         return event
     }
 
