@@ -27,9 +27,16 @@ fi
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
-URL="https://github.com/$REPO/releases/latest/download/Orca.tar.gz"
-echo "==> Downloading: $URL"
-curl -fL --progress-bar "$URL" -o "$TMP/Orca.tar.gz"
+# Private repos need an authenticated download; use gh when available, else curl.
+if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
+  echo "==> Downloading via gh ($REPO)"
+  gh release download --repo "$REPO" --pattern 'Orca.tar.gz' --dir "$TMP" --clobber
+else
+  URL="https://github.com/$REPO/releases/latest/download/Orca.tar.gz"
+  echo "==> Downloading: $URL"
+  echo "    (If $REPO is private, install gh and run 'gh auth login' first.)"
+  curl -fL --progress-bar "$URL" -o "$TMP/Orca.tar.gz"
+fi
 tar -xzf "$TMP/Orca.tar.gz" -C "$TMP"
 
 echo "==> App -> $APP_DEST"
