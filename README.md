@@ -12,6 +12,28 @@ multitasking across many sessions stops being a context-switching mess.
   forwards events to the app over a unix domain socket; if the app is not
   running it does nothing (your agent never breaks).
 
+## Quick Start (install on another Mac)
+
+The repo is **private**, so downloads need GitHub auth via the `gh` CLI.
+
+```sh
+# 1. Install and sign in to the GitHub CLI (once)
+brew install gh          # or grab it from https://cli.github.com
+gh auth login
+
+# 2. Clone and install the prebuilt app — no Xcode needed
+gh repo clone FatihErtugral/orca
+cd orca
+./install.sh
+```
+
+`install.sh` downloads the latest release, copies **Orca.app** to `/Applications`,
+clears the Gatekeeper quarantine, installs the `orca` CLI to `~/.local/bin`, adds
+the Claude Code hooks, and launches. Grant the notification prompt on first launch
+(and the Automation prompt the first time you click an agent to jump to its terminal).
+
+Building from source instead (needs Xcode)? Run `./scripts/dev-install.sh`.
+
 ## Architecture
 
 ```
@@ -40,17 +62,11 @@ JSON line to the socket. The core never changes.
 
 ### User (another Mac) — no Xcode required
 
-Installs the prebuilt universal (Intel + Apple Silicon) release:
-
-```sh
-curl -fsSL https://raw.githubusercontent.com/<owner>/<repo>/main/install.sh | bash
-```
-
-`install.sh` downloads the latest GitHub release, copies the app to
-`/Applications`, strips the Gatekeeper quarantine (so the ad-hoc-signed app
-opens), installs `orca` to `~/.local/bin`, adds the Claude Code hooks, and
-launches. Grant the notification prompt on first launch, and the Automation
-prompt on the first "jump to terminal" click.
+See [Quick Start](#quick-start-install-on-another-mac) above: `gh auth login`,
+`gh repo clone FatihErtugral/orca`, then `./install.sh` installs the prebuilt
+universal (Intel + Apple Silicon) release. `install.sh` uses `gh` to download the
+release asset (required because the repo is private) and falls back to `curl` for
+a public repo.
 
 ### Maintainer — publish a release
 
