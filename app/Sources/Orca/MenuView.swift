@@ -47,20 +47,15 @@ struct MenuView: View {
                 }
             }
 
-            Divider()
-
-            HStack {
-                if let version = updates.availableVersion {
-                    Button {
-                        updates.installUpdate()
-                    } label: {
-                        Label("Update to \(version)", systemImage: "arrow.down.circle.fill")
-                    }
+            if let version = updates.availableVersion {
+                Divider()
+                Button {
+                    updates.installUpdate()
+                } label: {
+                    Label("Update to \(version)", systemImage: "arrow.down.circle.fill")
                 }
-                Spacer()
-                Button("Quit") { NSApplication.shared.terminate(nil) }
+                .font(.caption)
             }
-            .font(.caption)
         }
         .padding(14)
         .frame(width: 320)

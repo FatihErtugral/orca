@@ -12,30 +12,20 @@ multitasking across many sessions stops being a context-switching mess.
   forwards events to the app over a unix domain socket; if the app is not
   running it does nothing (your agent never breaks).
 
-## Quick Start (install on another Mac)
+## Quick Start
 
-The repo is **private**, so sign in to the GitHub CLI once:
+One command — no clone, no Xcode (auto-detects Apple Silicon / Intel):
 
 ```sh
-brew install gh          # or grab it from https://cli.github.com
-gh auth login
+curl -fsSL https://raw.githubusercontent.com/FatihErtugral/orca/main/install.sh | bash
 ```
 
-Then run the installer for your Mac — one command, no clone, no env vars:
+While the repo is private, use the GitHub CLI instead (after `gh auth login`):
 
-**Apple Silicon** (M1/M2/M3…):
 ```sh
-gh api repos/FatihErtugral/orca/contents/install-arm64.sh \
+gh api repos/FatihErtugral/orca/contents/install.sh \
   -H "Accept: application/vnd.github.raw" | bash
 ```
-
-**Intel:**
-```sh
-gh api repos/FatihErtugral/orca/contents/install-intel.sh \
-  -H "Accept: application/vnd.github.raw" | bash
-```
-
-Not sure which? Run `uname -m` — `arm64` is Apple Silicon, `x86_64` is Intel.
 
 Either one downloads the matching **Orca.app** release, copies it to
 `/Applications`, clears the Gatekeeper quarantine, installs the `orca` CLI to
@@ -69,24 +59,23 @@ JSON line to the socket. The core never changes.
 
 ## Install
 
-### User (another Mac) — no Xcode required
+### User — see [Quick Start](#quick-start)
 
-See [Quick Start](#quick-start-install-on-another-mac) above: `gh auth login`,
-`gh repo clone FatihErtugral/orca`, then `./install.sh` installs the prebuilt
-universal (Intel + Apple Silicon) release. `install.sh` uses `gh` to download the
-release asset (required because the repo is private) and falls back to `curl` for
-a public repo.
+`install.sh` auto-detects your CPU and downloads `Orca-arm64.tar.gz` or
+`Orca-x86_64.tar.gz` from the latest release (via `gh` when available, plain
+`curl` otherwise). Arch-specific scripts also exist: `install-arm64.sh`,
+`install-intel.sh`.
 
 ### Maintainer — publish a release
 
 ```sh
-./scripts/release.sh v0.1.0     # builds universal dist/Orca.tar.gz + gh release
+./scripts/release.sh v0.3.0     # builds per-arch tarballs + creates the gh release
 ```
 
-Set `REPO` in `install.sh` to your `owner/repo` (or run with
-`ORCA_REPO="owner/repo"`). The release is ad-hoc signed; `install.sh` strips
-quarantine so it runs without notarization. For wide public distribution, an
-Apple Developer ID + notarization is recommended.
+The tag must match `OrcaVersion.current` and `Info.plist` (the script enforces
+this). Releases are ad-hoc signed; the installers strip quarantine so no
+notarization is needed. For wide public distribution, an Apple Developer ID +
+notarization is recommended.
 
 ### Developer (cloned repo, Xcode installed)
 
@@ -154,3 +143,9 @@ make format   # swiftformat (brew install swiftformat)
 - [x] Universal release + one-line installer
 - [ ] Launch at login (LaunchAgent)
 - [ ] Developer ID signing + notarization
+
+## License
+
+[PolyForm Noncommercial 1.0.0](LICENSE) — you may use, modify and share Orca
+for any **noncommercial** purpose. Commercial use of the software is not
+permitted without a separate license from the copyright holder.
