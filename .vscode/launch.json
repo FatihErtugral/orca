@@ -5,40 +5,40 @@
             "request": "launch",
             "args": [],
             "cwd": "${workspaceFolder:ai-reminder}/app",
-            "name": "Debug AgentBar (app)",
-            "target": "AgentBar",
+            "name": "Debug Orca (app)",
+            "target": "Orca",
             "configuration": "debug",
-            "preLaunchTask": "swift: Build Debug AgentBar (app)"
+            "preLaunchTask": "swift: Build Debug Orca (app)"
         },
         {
             "type": "swift",
             "request": "launch",
             "args": [],
             "cwd": "${workspaceFolder:ai-reminder}/app",
-            "name": "Release AgentBar (app)",
-            "target": "AgentBar",
+            "name": "Release Orca (app)",
+            "target": "Orca",
             "configuration": "release",
-            "preLaunchTask": "swift: Build Release AgentBar (app)"
+            "preLaunchTask": "swift: Build Release Orca (app)"
         },
         {
             "type": "swift",
             "request": "launch",
             "args": [],
             "cwd": "${workspaceFolder:ai-reminder}/bridge",
-            "name": "Debug agentbar (bridge)",
-            "target": "agentbar",
+            "name": "Debug orca (bridge)",
+            "target": "orca",
             "configuration": "debug",
-            "preLaunchTask": "swift: Build Debug agentbar (bridge)"
+            "preLaunchTask": "swift: Build Debug orca (bridge)"
         },
         {
             "type": "swift",
             "request": "launch",
             "args": [],
             "cwd": "${workspaceFolder:ai-reminder}/bridge",
-            "name": "Release agentbar (bridge)",
-            "target": "agentbar",
+            "name": "Release orca (bridge)",
+            "target": "orca",
             "configuration": "release",
-            "preLaunchTask": "swift: Build Release agentbar (bridge)"
+            "preLaunchTask": "swift: Build Release orca (bridge)"
         },
         {
             "type": "swift",

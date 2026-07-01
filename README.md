@@ -59,7 +59,7 @@ prompt on the first "jump to terminal" click.
 ```
 
 Set `REPO` in `install.sh` to your `owner/repo` (or run with
-`AGENTBAR_REPO="owner/repo"`). The release is ad-hoc signed; `install.sh` strips
+`ORCA_REPO="owner/repo"`). The release is ad-hoc signed; `install.sh` strips
 quarantine so it runs without notarization. For wide public distribution, an
 Apple Developer ID + notarization is recommended.
 

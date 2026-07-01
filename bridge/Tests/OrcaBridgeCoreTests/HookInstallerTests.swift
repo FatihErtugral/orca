@@ -4,7 +4,7 @@ import XCTest
 final class HookInstallerTests: XCTestCase {
     private let exe = "/usr/local/bin/orca"
 
-    private func agentBarEntries(_ root: [String: Any], event: String) -> [[String: Any]] {
+    private func orcaEntries(_ root: [String: Any], event: String) -> [[String: Any]] {
         let hooks = root["hooks"] as? [String: Any] ?? [:]
         let entries = hooks[event] as? [[String: Any]] ?? []
         return entries.filter { entry in
@@ -21,7 +21,7 @@ final class HookInstallerTests: XCTestCase {
         let root = readJSON(path)
         XCTAssertEqual(root["theme"] as? String, "dark")
         for (event, _) in installer.hooks() {
-            XCTAssertEqual(agentBarEntries(root, event: event).count, 1, "missing hook \(event)")
+            XCTAssertEqual(orcaEntries(root, event: event).count, 1, "missing hook \(event)")
         }
     }
 
@@ -41,7 +41,7 @@ final class HookInstallerTests: XCTestCase {
         let installer = HookInstaller(settingsPath: path, executablePath: exe)
         XCTAssertTrue(installer.install())
         XCTAssertTrue(installer.install())
-        XCTAssertEqual(agentBarEntries(readJSON(path), event: "Stop").count, 1)
+        XCTAssertEqual(orcaEntries(readJSON(path), event: "Stop").count, 1)
     }
 
     func testUninstallRemovesOnlyOrcaHooks() {
@@ -53,7 +53,7 @@ final class HookInstallerTests: XCTestCase {
         XCTAssertTrue(installer.uninstall())
 
         let root = readJSON(path)
-        XCTAssertEqual(agentBarEntries(root, event: "Stop").count, 0)
+        XCTAssertEqual(orcaEntries(root, event: "Stop").count, 0)
         let stop = (root["hooks"] as! [String: Any])["Stop"] as! [[String: Any]]
         XCTAssertEqual(stop.count, 1)
     }
