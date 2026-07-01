@@ -51,4 +51,38 @@ final class EventBuilderTests: XCTestCase {
         XCTAssertEqual(event.source, "custom")
         XCTAssertEqual(event.status, "running")
     }
+
+    func testStopWithPendingBackgroundStaysRunning() {
+        let event = builder().event(
+            flags: ["source": "claude-code", "status": "waiting"],
+            hook: ["session_id": "s", "cwd": "/p", "hook_event_name": "Stop", "background_tasks_pending": true]
+        )
+        XCTAssertEqual(event.status, "running")
+        XCTAssertEqual(event.message, "Working in background")
+    }
+
+    func testStopAwaitingBackgroundStaysRunning() {
+        let event = builder().event(
+            flags: ["source": "claude-code", "status": "waiting"],
+            hook: ["session_id": "s", "awaiting_background": true]
+        )
+        XCTAssertEqual(event.status, "running")
+    }
+
+    func testStopWithoutBackgroundBecomesWaiting() {
+        let event = builder().event(
+            flags: ["source": "claude-code", "status": "waiting", "message": "Your turn"],
+            hook: ["session_id": "s", "background_tasks_pending": false, "awaiting_background": false]
+        )
+        XCTAssertEqual(event.status, "waiting")
+        XCTAssertEqual(event.message, "Your turn")
+    }
+
+    func testEventCarriesTranscriptPath() {
+        let event = builder(title: "T").event(
+            flags: ["source": "claude-code", "status": "running"],
+            hook: ["session_id": "s", "transcript_path": "/t/x.jsonl"]
+        )
+        XCTAssertEqual(event.transcriptPath, "/t/x.jsonl")
+    }
 }

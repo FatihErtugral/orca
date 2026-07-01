@@ -10,6 +10,7 @@ public final class AgentStore: ObservableObject {
     private var ollamaIDs: Set<String> = []
 
     private let notifications: NotificationScheduling
+    private let preferences: () -> NotificationPreferences
     private let now: () -> Date
     private let doneGrace: TimeInterval
     private let staleTTL: TimeInterval
@@ -17,11 +18,13 @@ public final class AgentStore: ObservableObject {
 
     public init(
         notifications: NotificationScheduling,
+        preferences: @escaping () -> NotificationPreferences = { NotificationPreferences() },
         now: @escaping () -> Date = Date.init,
         doneGrace: TimeInterval = 90,
         staleTTL: TimeInterval = 1800
     ) {
         self.notifications = notifications
+        self.preferences = preferences
         self.now = now
         self.doneGrace = doneGrace
         self.staleTTL = staleTTL
@@ -84,6 +87,7 @@ public final class AgentStore: ObservableObject {
         if let termProgram = event.termProgram { agent.termProgram = termProgram }
         if let session = event.session { agent.session = session }
         if let appBundleId = event.appBundleId { agent.appBundleId = appBundleId }
+        if let transcriptPath = event.transcriptPath { agent.transcriptPath = transcriptPath }
         agent.status = status
         agent.message = event.message
         agent.lastUpdate = timestamp
@@ -92,6 +96,14 @@ public final class AgentStore: ObservableObject {
         publish()
 
         if previous != status { notify(agent) }
+    }
+
+    /// Update a title out-of-band (e.g. after a /rename is detected in the transcript).
+    public func updateTitle(id: String, title: String) {
+        guard var agent = map[id], agent.title != title, !title.isEmpty else { return }
+        agent.title = title
+        map[id] = agent
+        publish()
     }
 
     public func syncOllama(models: [String]) {
@@ -155,13 +167,17 @@ public final class AgentStore: ObservableObject {
     }
 
     private func notify(_ agent: Agent) {
+        let prefs = preferences()
+        guard prefs.shouldNotify(for: agent.status) else { return }
+
+        let sound = prefs.soundEnabled
         switch agent.status {
         case .waiting:
-            notifications.schedule(title: "⏳ \(agent.title)", body: agent.message ?? "Waiting for you")
+            notifications.schedule(title: "⏳ \(agent.title)", body: agent.message ?? "Waiting for you", sound: sound)
         case .done:
-            notifications.schedule(title: "✅ \(agent.title)", body: agent.message ?? "Finished")
+            notifications.schedule(title: "✅ \(agent.title)", body: agent.message ?? "Finished", sound: sound)
         case .error:
-            notifications.schedule(title: "❌ \(agent.title)", body: agent.message ?? "Error")
+            notifications.schedule(title: "❌ \(agent.title)", body: agent.message ?? "Error", sound: sound)
         case .running, .idle:
             break
         }

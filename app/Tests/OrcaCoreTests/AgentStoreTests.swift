@@ -2,8 +2,8 @@ import XCTest
 @testable import OrcaCore
 
 private final class NotificationSpy: NotificationScheduling {
-    private(set) var scheduled: [(title: String, body: String)] = []
-    func schedule(title: String, body: String) { scheduled.append((title, body)) }
+    private(set) var scheduled: [(title: String, body: String, sound: Bool)] = []
+    func schedule(title: String, body: String, sound: Bool) { scheduled.append((title, body, sound)) }
 }
 
 private final class Clock {
@@ -76,6 +76,39 @@ final class AgentStoreTests: XCTestCase {
         XCTAssertFalse(store.hasFinished)
         store.apply(event("b", "error"))
         XCTAssertTrue(store.hasFinished)
+    }
+
+    func testDisabledNotificationsSuppressAll() {
+        let spy = NotificationSpy()
+        let store = AgentStore(
+            notifications: spy,
+            preferences: { NotificationPreferences(notificationsEnabled: false) }
+        )
+        store.apply(event("a", "waiting"))
+        store.apply(event("a", "error"))
+        XCTAssertTrue(spy.scheduled.isEmpty)
+    }
+
+    func testPerStatusToggleSuppressesOnlyThatStatus() {
+        let spy = NotificationSpy()
+        let store = AgentStore(
+            notifications: spy,
+            preferences: { NotificationPreferences(notifyOnWaiting: false) }
+        )
+        store.apply(event("a", "waiting"))
+        XCTAssertTrue(spy.scheduled.isEmpty)
+        store.apply(event("a", "error"))
+        XCTAssertEqual(spy.scheduled.count, 1)
+    }
+
+    func testSoundPreferencePropagates() {
+        let spy = NotificationSpy()
+        let store = AgentStore(
+            notifications: spy,
+            preferences: { NotificationPreferences(soundEnabled: false) }
+        )
+        store.apply(event("a", "waiting"))
+        XCTAssertEqual(spy.scheduled.first?.sound, false)
     }
 
     func testNotifiesOnAttentionTransitionsOnly() {

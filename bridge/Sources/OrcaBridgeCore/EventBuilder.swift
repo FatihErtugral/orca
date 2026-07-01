@@ -29,16 +29,33 @@ public struct EventBuilder {
         let sessionTitle = source == "claude-code" ? transcriptPath.flatMap(sessionTitleProvider) : nil
         let title = flags["title"] ?? sessionTitle ?? Self.basename(cwd)
 
+        var status = flags["status"] ?? "running"
+        var message = flags["message"]
+        // A Stop that fires while background tasks are still pending is not
+        // "your turn" — Claude will auto-resume, so keep the agent running.
+        if status == "waiting", Self.backgroundWorkPending(hook) {
+            status = "running"
+            message = "Working in background"
+        }
+
         return decorate(
             AgentEvent(
                 id: id,
                 source: source,
                 title: title,
                 cwd: cwd,
-                status: flags["status"] ?? "running",
-                message: flags["message"]
+                status: status,
+                message: message,
+                transcriptPath: transcriptPath
             )
         )
+    }
+
+    static func backgroundWorkPending(_ hook: [String: Any]?) -> Bool {
+        guard let hook = hook else { return false }
+        let pending = hook["background_tasks_pending"] as? Bool ?? false
+        let awaiting = hook["awaiting_background"] as? Bool ?? false
+        return pending || awaiting
     }
 
     public func wrapEvent(

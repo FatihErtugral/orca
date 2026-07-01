@@ -14,9 +14,14 @@ struct OrcaApp: App {
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private let notifier = UserNotificationScheduler()
-    private lazy var store = AgentStore(notifications: notifier)
+    private let preferencesStore = PreferencesStore()
+    private lazy var store = AgentStore(
+        notifications: notifier,
+        preferences: { [preferencesStore] in preferencesStore.preferences }
+    )
     private let focuser = TerminalFocuser()
     private let stateStore = AgentStateStore()
+    private let titleRefresher = SessionTitleRefresher()
 
     private var statusItem: NSStatusItem!
     private let popover = NSPopover()
@@ -28,6 +33,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.setActivationPolicy(.accessory)
         notifier.requestAuthorization()
         store.startPruning()
+        titleRefresher.start(store: store)
 
         setupStatusItem()
         setupPopover()
@@ -72,6 +78,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 }
             )
             .environmentObject(store)
+            .environmentObject(preferencesStore)
         )
     }
 

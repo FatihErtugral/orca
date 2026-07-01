@@ -3,6 +3,8 @@ import SwiftUI
 
 struct MenuView: View {
     @EnvironmentObject var store: AgentStore
+    @EnvironmentObject var preferences: PreferencesStore
+    @State private var showSettings = false
     let onSelectAgent: (Agent) -> Void
     let onDismissAgent: (Agent) -> Void
 
@@ -14,11 +16,21 @@ struct MenuView: View {
                 Text("\(store.runningCount) active · \(store.openSessionCount) open")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                Button {
+                    showSettings.toggle()
+                } label: {
+                    Image(systemName: showSettings ? "gearshape.fill" : "gearshape")
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
+                .help("Notification & sound settings")
             }
 
             Divider()
 
-            if store.agents.isEmpty {
+            if showSettings {
+                settings
+            } else if store.agents.isEmpty {
                 Text("No active agents")
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -45,6 +57,28 @@ struct MenuView: View {
         }
         .padding(14)
         .frame(width: 320)
+    }
+
+    private var settings: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Notifications").font(.subheadline).fontWeight(.semibold)
+            Toggle("Enable notifications", isOn: $preferences.preferences.notificationsEnabled)
+            Group {
+                Toggle("Waiting for input", isOn: $preferences.preferences.notifyOnWaiting)
+                Toggle("Finished", isOn: $preferences.preferences.notifyOnDone)
+                Toggle("Errors", isOn: $preferences.preferences.notifyOnError)
+            }
+            .padding(.leading, 12)
+            .disabled(!preferences.preferences.notificationsEnabled)
+
+            Text("Sound").font(.subheadline).fontWeight(.semibold).padding(.top, 4)
+            Toggle("Play sound", isOn: $preferences.preferences.soundEnabled)
+                .disabled(!preferences.preferences.notificationsEnabled)
+        }
+        .toggleStyle(.switch)
+        .controlSize(.mini)
+        .font(.callout)
+        .padding(.vertical, 4)
     }
 
     @ViewBuilder
