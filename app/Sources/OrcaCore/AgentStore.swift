@@ -18,12 +18,19 @@ public final class AgentStore: ObservableObject {
     private let processAlive: (Int32) -> Bool
     private let waitingConfirmDelay: TimeInterval
     private let quietRevertDelay: TimeInterval
+    private let autoQuietDelay: TimeInterval
     private var pruneTimer: Timer?
 
     /// Waiting notifications held back until the transcript stays quiet, so a
     /// session that auto-resumes (background tasks, worktree agents) never
-    /// produces a false "your turn".
-    private var pendingWaiting: [String: Date] = [:]
+    /// produces a false "your turn". Each entry records how much quiet it still
+    /// has to prove (a demote already proved a long quiet window).
+    private struct PendingNotice {
+        let since: Date
+        let requiredQuiet: TimeInterval
+    }
+
+    private var pendingWaiting: [String: PendingNotice] = [:]
 
     public init(
         notifications: NotificationScheduling,
@@ -34,7 +41,8 @@ public final class AgentStore: ObservableObject {
         activity: TranscriptActivityTracking = TranscriptActivityMonitor(),
         processAlive: @escaping (Int32) -> Bool = AgentStore.isProcessAlive,
         waitingConfirmDelay: TimeInterval = 6,
-        quietRevertDelay: TimeInterval = 30
+        quietRevertDelay: TimeInterval = 30,
+        autoQuietDelay: TimeInterval = 90
     ) {
         self.notifications = notifications
         self.preferences = preferences
@@ -45,6 +53,16 @@ public final class AgentStore: ObservableObject {
         self.processAlive = processAlive
         self.waitingConfirmDelay = waitingConfirmDelay
         self.quietRevertDelay = quietRevertDelay
+        self.autoQuietDelay = autoQuietDelay
+    }
+
+    /// Sessions that answer themselves (auto/bypass permission modes, or ones
+    /// observed auto-resuming) only notify after a long full quiet — the user
+    /// wants to hear from them when they are truly done, not between cycles.
+    private func confirmDelay(for agent: Agent) -> TimeInterval {
+        let selfPacingModes: Set<String> = ["auto", "bypassPermissions", "dontAsk"]
+        let selfPacing = agent.autoResumed || selfPacingModes.contains(agent.permissionMode ?? "")
+        return selfPacing ? autoQuietDelay : waitingConfirmDelay
     }
 
     public static func isProcessAlive(_ pid: Int32) -> Bool {
@@ -96,6 +114,7 @@ public final class AgentStore: ObservableObject {
                 revived.status = .running
                 revived.message = "Working…"
                 revived.revivedByActivity = true
+                revived.autoResumed = true
                 revived.runStartedAt = revived.runStartedAt ?? modified
                 revived.lastUpdate = currentTime
                 map[agent.id] = revived
@@ -115,17 +134,17 @@ public final class AgentStore: ObservableObject {
                 demoted.lastUpdate = currentTime
                 map[agent.id] = demoted
                 activity.rebaseline(path)
-                pendingWaiting[agent.id] = currentTime
+                pendingWaiting[agent.id] = PendingNotice(since: currentTime, requiredQuiet: waitingConfirmDelay)
                 changed = true
             }
         }
 
-        for (id, since) in pendingWaiting {
+        for (id, notice) in pendingWaiting {
             guard let agent = map[id], agent.status == .waiting else {
                 pendingWaiting.removeValue(forKey: id)
                 continue
             }
-            guard currentTime.timeIntervalSince(since) >= waitingConfirmDelay else { continue }
+            guard currentTime.timeIntervalSince(notice.since) >= notice.requiredQuiet else { continue }
             // The transcript was rebaselined when the stop arrived, so any
             // meaningful record since then means Claude resumed — never notify.
             let resumed = agent.transcriptPath.flatMap { activity.lastMeaningfulActivity($0) } != nil
@@ -175,6 +194,8 @@ public final class AgentStore: ObservableObject {
         if let appBundleId = event.appBundleId { agent.appBundleId = appBundleId }
         if let transcriptPath = event.transcriptPath { agent.transcriptPath = transcriptPath }
         if let pid = event.pid { agent.pid = pid }
+        if let permissionMode = event.permissionMode { agent.permissionMode = permissionMode }
+        if status == .running { agent.autoResumed = false }
         agent.status = status
         agent.message = event.message
         agent.lastUpdate = timestamp
@@ -191,7 +212,7 @@ public final class AgentStore: ObservableObject {
         // auto-resume after background tasks.
         if status == .waiting, let path = agent.transcriptPath {
             activity.rebaseline(path)
-            pendingWaiting[event.id] = timestamp
+            pendingWaiting[event.id] = PendingNotice(since: timestamp, requiredQuiet: confirmDelay(for: agent))
         } else {
             notify(agent)
         }

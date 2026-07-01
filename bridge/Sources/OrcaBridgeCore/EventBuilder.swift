@@ -46,7 +46,8 @@ public struct EventBuilder {
                 cwd: cwd,
                 status: status,
                 message: message,
-                transcriptPath: transcriptPath
+                transcriptPath: transcriptPath,
+                permissionMode: hook?["permission_mode"] as? String
             )
         )
     }

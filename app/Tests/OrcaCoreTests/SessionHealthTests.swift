@@ -171,6 +171,81 @@ final class SessionHealthTests: XCTestCase {
         XCTAssertEqual(store.agents.first?.status, .waiting)
     }
 
+    func testAutoModeSessionStaysSilentBetweenCyclesNotifiesOnceWhenDone() {
+        let spy = NotificationSpy()
+        let store = makeStore(spy: spy)
+        alivePIDs = [42]
+
+        func autoEvent(_ status: String) -> AgentEvent {
+            AgentEvent(id: "s1", source: "claude-code", title: "proj", cwd: "/p", status: status,
+                       transcriptPath: "/t/x.jsonl", pid: 42, permissionMode: "auto")
+        }
+
+        // Three self-answering cycles: stop → short quiet → resumes. No pings.
+        for _ in 0..<3 {
+            store.apply(autoEvent("waiting"))
+            currentTime = currentTime.addingTimeInterval(10)
+            store.evaluateHealth()
+            XCTAssertTrue(spy.scheduled.isEmpty)
+
+            activity.meaningful = currentTime.addingTimeInterval(1)
+            currentTime = currentTime.addingTimeInterval(4)
+            store.evaluateHealth()
+            XCTAssertEqual(store.agents.first?.status, .running)
+            store.apply(autoEvent("running"))
+        }
+
+        // Final stop: long full quiet → exactly one notification.
+        store.apply(autoEvent("waiting"))
+        currentTime = currentTime.addingTimeInterval(30)
+        store.evaluateHealth()
+        XCTAssertTrue(spy.scheduled.isEmpty)
+
+        currentTime = currentTime.addingTimeInterval(70)
+        store.evaluateHealth()
+        XCTAssertEqual(spy.scheduled.count, 1)
+        store.evaluateHealth()
+        XCTAssertEqual(spy.scheduled.count, 1)
+    }
+
+    func testLearnedAutoResumeUsesLongDelayEvenWithoutMode() {
+        let spy = NotificationSpy()
+        let store = makeStore(spy: spy)
+        alivePIDs = [42]
+        store.apply(claudeEvent("waiting", pid: 42))
+
+        // Session resumes by itself once: it is now known to self-pace.
+        activity.meaningful = currentTime.addingTimeInterval(1)
+        store.evaluateHealth()
+        XCTAssertEqual(store.agents.first?.status, .running)
+
+        // Real stop: 10s quiet is no longer enough…
+        store.apply(claudeEvent("waiting", pid: 42))
+        currentTime = currentTime.addingTimeInterval(10)
+        store.evaluateHealth()
+        XCTAssertTrue(spy.scheduled.isEmpty)
+        // …but sustained quiet notifies.
+        currentTime = currentTime.addingTimeInterval(85)
+        store.evaluateHealth()
+        XCTAssertEqual(spy.scheduled.count, 1)
+    }
+
+    func testUserPromptResetsToFastNotifications() {
+        let spy = NotificationSpy()
+        let store = makeStore(spy: spy)
+        alivePIDs = [42]
+        store.apply(claudeEvent("waiting", pid: 42))
+        activity.meaningful = currentTime.addingTimeInterval(1)
+        store.evaluateHealth()
+
+        // Hook-reported running (user prompt) clears the learned flag.
+        store.apply(claudeEvent("running", pid: 42))
+        store.apply(claudeEvent("waiting", pid: 42))
+        currentTime = currentTime.addingTimeInterval(7)
+        store.evaluateHealth()
+        XCTAssertEqual(spy.scheduled.count, 1)
+    }
+
     func testLivePidSurvivesStaleTTLPrune() {
         let store = makeStore()
         alivePIDs = [42]
