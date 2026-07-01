@@ -26,7 +26,7 @@ anyone with repo access; uses your GitHub auth):
 
 ```sh
 gh api repos/FatihErtugral/orca/contents/install.sh \
-  -H "Accept: application/vnd.github.raw" | bash
+  -H "Accept: application/vnd.github.raw" | ORCA_REPO="FatihErtugral/orca" bash
 ```
 
 This fetches `install.sh` over your auth and runs it: downloads the latest
