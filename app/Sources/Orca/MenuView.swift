@@ -81,10 +81,19 @@ struct MenuView: View {
             Toggle("Play sound", isOn: $preferences.preferences.soundEnabled)
                 .disabled(!preferences.preferences.notificationsEnabled)
 
-            Text("Orca v\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?")")
-                .font(.caption2)
-                .foregroundStyle(.tertiary)
-                .padding(.top, 6)
+            HStack {
+                Text("Orca v\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?")")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+                Spacer()
+                Button {
+                    updates.checkAndInstall()
+                } label: {
+                    Text(checkButtonLabel).font(.caption2)
+                }
+                .disabled(updates.checkState == .checking)
+            }
+            .padding(.top, 6)
         }
         .toggleStyle(.switch)
         .controlSize(.mini)
@@ -128,6 +137,15 @@ struct MenuView: View {
             .buttonStyle(.plain)
             .foregroundStyle(.tertiary)
             .help("Dismiss")
+        }
+    }
+
+    private var checkButtonLabel: String {
+        switch updates.checkState {
+        case .idle: return "Check for updates"
+        case .checking: return "Checking…"
+        case .upToDate: return "Up to date ✓"
+        case .installing(let version): return "Installing \(version)…"
         }
     }
 
