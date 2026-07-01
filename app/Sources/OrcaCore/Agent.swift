@@ -35,6 +35,9 @@ public struct Agent: Identifiable, Equatable {
     public var appBundleId: String?
     public var transcriptPath: String?
     public var pid: Int32?
+    /// True when health evaluation promoted this agent to running from transcript
+    /// activity (not from a hook); such agents demote back once activity stops.
+    public var revivedByActivity: Bool = false
 
     public init(
         id: String,

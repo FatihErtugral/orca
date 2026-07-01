@@ -17,6 +17,7 @@ public final class AgentStore: ObservableObject {
     private let activity: TranscriptActivityTracking
     private let processAlive: (Int32) -> Bool
     private let waitingConfirmDelay: TimeInterval
+    private let quietRevertDelay: TimeInterval
     private var pruneTimer: Timer?
 
     /// Waiting notifications held back until the transcript stays quiet, so a
@@ -32,7 +33,8 @@ public final class AgentStore: ObservableObject {
         staleTTL: TimeInterval = 1800,
         activity: TranscriptActivityTracking = TranscriptActivityMonitor(),
         processAlive: @escaping (Int32) -> Bool = AgentStore.isProcessAlive,
-        waitingConfirmDelay: TimeInterval = 6
+        waitingConfirmDelay: TimeInterval = 6,
+        quietRevertDelay: TimeInterval = 30
     ) {
         self.notifications = notifications
         self.preferences = preferences
@@ -42,6 +44,7 @@ public final class AgentStore: ObservableObject {
         self.activity = activity
         self.processAlive = processAlive
         self.waitingConfirmDelay = waitingConfirmDelay
+        self.quietRevertDelay = quietRevertDelay
     }
 
     public static func isProcessAlive(_ pid: Int32) -> Bool {
@@ -67,10 +70,12 @@ public final class AgentStore: ObservableObject {
         }
     }
 
-    /// Reconciles reported hook state with ground truth: removes agents whose
-    /// owning process died, revives "waiting" sessions whose transcript is still
-    /// being written (auto-resume the hooks can't see), and releases debounced
-    /// waiting notifications once the transcript has stayed quiet.
+    /// Reconciles reported hook state with transcript ground truth, in BOTH
+    /// directions so the state always converges: activity promotes a "waiting"
+    /// session to running (auto-resume the hooks can't see), sustained quiet
+    /// demotes an activity-promoted session back to waiting (a late flush after
+    /// the stop must not latch it as running forever). Also removes agents whose
+    /// owning process died and releases debounced waiting notifications.
     public func evaluateHealth() {
         let currentTime = now()
         var changed = false
@@ -83,16 +88,34 @@ public final class AgentStore: ObservableObject {
                 continue
             }
 
-            if agent.status == .waiting,
-               let path = agent.transcriptPath,
-               let modified = activity.lastMeaningfulActivity(path) {
+            guard let path = agent.transcriptPath else { continue }
+            let lastActivity = activity.lastMeaningfulActivity(path)
+
+            if agent.status == .waiting, let modified = lastActivity {
                 var revived = agent
                 revived.status = .running
                 revived.message = "Working…"
+                revived.revivedByActivity = true
                 revived.runStartedAt = revived.runStartedAt ?? modified
                 revived.lastUpdate = currentTime
                 map[agent.id] = revived
                 pendingWaiting.removeValue(forKey: agent.id)
+                changed = true
+            } else if agent.status == .running, agent.revivedByActivity,
+                      let modified = lastActivity,
+                      currentTime.timeIntervalSince(modified) >= quietRevertDelay {
+                var demoted = agent
+                demoted.status = .waiting
+                demoted.message = "Waiting for you"
+                demoted.revivedByActivity = false
+                if let start = demoted.runStartedAt {
+                    demoted.lastRunDuration = modified.timeIntervalSince(start)
+                }
+                demoted.runStartedAt = nil
+                demoted.lastUpdate = currentTime
+                map[agent.id] = demoted
+                activity.rebaseline(path)
+                pendingWaiting[agent.id] = currentTime
                 changed = true
             }
         }
@@ -155,6 +178,7 @@ public final class AgentStore: ObservableObject {
         agent.status = status
         agent.message = event.message
         agent.lastUpdate = timestamp
+        agent.revivedByActivity = false
 
         map[event.id] = agent
 

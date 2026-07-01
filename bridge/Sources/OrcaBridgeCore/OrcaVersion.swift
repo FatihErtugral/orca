@@ -1,7 +1,7 @@
 import Foundation
 
 public enum OrcaVersion {
-    public static let current = "0.3.0"
+    public static let current = "0.3.1"
     public static let repo = "FatihErtugral/orca"
 
     /// Numeric, piecewise semver comparison; tolerates a leading "v".

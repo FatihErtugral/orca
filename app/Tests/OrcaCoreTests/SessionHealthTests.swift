@@ -112,6 +112,65 @@ final class SessionHealthTests: XCTestCase {
         XCTAssertTrue(spy.scheduled.isEmpty)
     }
 
+    func testLateFlushRevivesThenDemotesBackToWaiting() {
+        let spy = NotificationSpy()
+        let store = makeStore(spy: spy)
+        alivePIDs = [42]
+        store.apply(claudeEvent("waiting", pid: 42))
+
+        // A record flushed just after the stop wrongly revives the session…
+        activity.meaningful = currentTime.addingTimeInterval(1)
+        currentTime = currentTime.addingTimeInterval(4)
+        store.evaluateHealth()
+        XCTAssertEqual(store.agents.first?.status, .running)
+
+        // …but with no further activity it must converge back to waiting.
+        currentTime = currentTime.addingTimeInterval(31)
+        store.evaluateHealth()
+        XCTAssertEqual(store.agents.first?.status, .waiting)
+        XCTAssertEqual(store.agents.first?.message, "Waiting for you")
+
+        // And the (rebaselined-quiet) waiting notification is finally delivered.
+        currentTime = currentTime.addingTimeInterval(7)
+        store.evaluateHealth()
+        XCTAssertEqual(spy.scheduled.count, 1)
+    }
+
+    func testOngoingActivityKeepsRevivedSessionRunning() {
+        let store = makeStore()
+        alivePIDs = [42]
+        store.apply(claudeEvent("waiting", pid: 42))
+
+        activity.meaningful = currentTime.addingTimeInterval(1)
+        currentTime = currentTime.addingTimeInterval(4)
+        store.evaluateHealth()
+        XCTAssertEqual(store.agents.first?.status, .running)
+
+        // Fresh activity keeps arriving: never demote.
+        for _ in 0..<5 {
+            currentTime = currentTime.addingTimeInterval(20)
+            activity.meaningful = currentTime.addingTimeInterval(-2)
+            store.evaluateHealth()
+            XCTAssertEqual(store.agents.first?.status, .running)
+        }
+    }
+
+    func testHookEventOverridesRevivedState() {
+        let store = makeStore()
+        alivePIDs = [42]
+        store.apply(claudeEvent("waiting", pid: 42))
+        activity.meaningful = currentTime.addingTimeInterval(1)
+        store.evaluateHealth()
+        XCTAssertEqual(store.agents.first?.status, .running)
+
+        // A real Stop hook arrives: waiting again, and rebaseline clears the
+        // stale activity so it cannot immediately re-revive.
+        store.apply(claudeEvent("waiting", pid: 42))
+        XCTAssertEqual(store.agents.first?.status, .waiting)
+        store.evaluateHealth()
+        XCTAssertEqual(store.agents.first?.status, .waiting)
+    }
+
     func testLivePidSurvivesStaleTTLPrune() {
         let store = makeStore()
         alivePIDs = [42]
