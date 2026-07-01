@@ -21,22 +21,27 @@ brew install gh          # or grab it from https://cli.github.com
 gh auth login
 ```
 
-Then install with a **single command — no clone, no manual download** (works for
-anyone with repo access; uses your GitHub auth):
+Then run the installer for your Mac — one command, no clone, no env vars:
 
+**Apple Silicon** (M1/M2/M3…):
 ```sh
-gh api repos/FatihErtugral/orca/contents/install.sh \
-  -H "Accept: application/vnd.github.raw" | ORCA_REPO="FatihErtugral/orca" bash
+gh api repos/FatihErtugral/orca/contents/install-arm64.sh \
+  -H "Accept: application/vnd.github.raw" | bash
 ```
 
-This fetches `install.sh` over your auth and runs it: downloads the latest
-**Orca.app** release, copies it to `/Applications`, clears the Gatekeeper
-quarantine, installs the `orca` CLI to `~/.local/bin`, adds the Claude Code hooks,
-and launches. Grant the notification prompt on first launch (and the Automation
-prompt the first time you click an agent to jump to its terminal).
+**Intel:**
+```sh
+gh api repos/FatihErtugral/orca/contents/install-intel.sh \
+  -H "Accept: application/vnd.github.raw" | bash
+```
 
-Alternatives: clone first with `gh repo clone FatihErtugral/orca && cd orca && ./install.sh`,
-or build from source (needs Xcode) with `./scripts/dev-install.sh`.
+Not sure which? Run `uname -m` — `arm64` is Apple Silicon, `x86_64` is Intel.
+
+Either one downloads the matching **Orca.app** release, copies it to
+`/Applications`, clears the Gatekeeper quarantine, installs the `orca` CLI to
+`~/.local/bin`, adds the Claude Code hooks, and launches. Grant the notification
+prompt on first launch (and the Automation prompt the first time you jump to a
+terminal). To clone and build from source instead, use `./scripts/dev-install.sh`.
 
 ## Architecture
 

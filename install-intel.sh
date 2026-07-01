@@ -1,14 +1,11 @@
 #!/usr/bin/env bash
 #
-# Orca installer (no Xcode required — downloads a prebuilt release).
-# Auto-detects the CPU architecture. For an explicit build use
-# install-arm64.sh (Apple Silicon) or install-intel.sh (Intel).
+# Orca installer for Intel Macs (x86_64). No Xcode required.
 #
 set -euo pipefail
 
 REPO="FatihErtugral/orca"
-ARCH="$(uname -m)"                         # arm64 (Apple Silicon) or x86_64 (Intel)
-ASSET="Orca-${ARCH}.tar.gz"
+ASSET="Orca-x86_64.tar.gz"
 BIN_DIR="$HOME/.local/bin"
 APP_DEST="/Applications/Orca.app"
 
@@ -17,7 +14,7 @@ APP_DEST="/Applications/Orca.app"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
-echo "==> Downloading $ASSET"
+echo "==> Downloading $ASSET (Intel)"
 if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
   gh release download --repo "$REPO" --pattern "$ASSET" --dir "$TMP" --clobber
 else
