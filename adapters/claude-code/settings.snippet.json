@@ -1,0 +1,20 @@
+{
+  "_comment": "Prefer `orca install-hooks`, which merges these automatically. Otherwise add this 'hooks' block to your global ~/.claude/settings.json or a project's .claude/settings.json, and make sure 'orca' is on PATH (make install-bridge). Claude Code passes session_id, cwd and transcript_path on each hook's stdin; orca reads them. Status mapping: UserPromptSubmit/SessionStart = running, Notification/Stop = waiting, SessionEnd = closed.",
+  "hooks": {
+    "SessionStart": [
+      { "hooks": [ { "type": "command", "command": "orca event --source claude-code --status running" } ] }
+    ],
+    "UserPromptSubmit": [
+      { "hooks": [ { "type": "command", "command": "orca event --source claude-code --status running" } ] }
+    ],
+    "Notification": [
+      { "hooks": [ { "type": "command", "command": "orca event --source claude-code --status waiting --message 'Waiting for your input'" } ] }
+    ],
+    "Stop": [
+      { "hooks": [ { "type": "command", "command": "orca event --source claude-code --status waiting --message 'Response ready, your turn'" } ] }
+    ],
+    "SessionEnd": [
+      { "hooks": [ { "type": "command", "command": "orca event --source claude-code --status closed" } ] }
+    ]
+  }
+}

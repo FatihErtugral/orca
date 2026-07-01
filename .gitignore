@@ -1,0 +1,9 @@
+.DS_Store
+build/
+.build/
+app/.build/
+bridge/.build/
+*.swiftpm
+xcuserdata/
+app/AppIcon.iconset/
+dist/

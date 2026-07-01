@@ -1,0 +1,39 @@
+# SwiftLint configuration — https://github.com/realm/SwiftLint
+included:
+  - app/Sources
+  - app/Tests
+  - bridge/Sources
+  - bridge/Tests
+
+excluded:
+  - .build
+  - build
+  - dist
+  - app/Sources/Orca/DolphinAsset.swift
+
+line_length:
+  warning: 120
+  error: 160
+  ignores_comments: true
+
+identifier_name:
+  min_length: 2
+  excluded: [id, x, y, r, g, b, w, h, fd, ns, cg]
+
+type_name:
+  min_length: 3
+
+function_body_length:
+  warning: 60
+  error: 100
+
+opt_in_rules:
+  - empty_count
+  - explicit_init
+  - closure_spacing
+  - operator_usage_whitespace
+  - redundant_nil_coalescing
+  - toggle_bool
+
+disabled_rules:
+  - todo
