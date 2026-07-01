@@ -4,6 +4,7 @@ import SwiftUI
 struct MenuView: View {
     @EnvironmentObject var store: AgentStore
     @EnvironmentObject var preferences: PreferencesStore
+    @EnvironmentObject var updates: UpdateMonitor
     @State private var showSettings = false
     let onSelectAgent: (Agent) -> Void
     let onDismissAgent: (Agent) -> Void
@@ -48,8 +49,13 @@ struct MenuView: View {
             Divider()
 
             HStack {
-                Button("Clear finished") { store.clearFinished() }
-                    .disabled(!store.hasFinished)
+                if let version = updates.availableVersion {
+                    Button {
+                        updates.installUpdate()
+                    } label: {
+                        Label("Update to \(version)", systemImage: "arrow.down.circle.fill")
+                    }
+                }
                 Spacer()
                 Button("Quit") { NSApplication.shared.terminate(nil) }
             }
@@ -74,6 +80,11 @@ struct MenuView: View {
             Text("Sound").font(.subheadline).fontWeight(.semibold).padding(.top, 4)
             Toggle("Play sound", isOn: $preferences.preferences.soundEnabled)
                 .disabled(!preferences.preferences.notificationsEnabled)
+
+            Text("Orca v\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?")")
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+                .padding(.top, 6)
         }
         .toggleStyle(.switch)
         .controlSize(.mini)

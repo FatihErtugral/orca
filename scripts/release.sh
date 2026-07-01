@@ -43,6 +43,15 @@ build_arch x86_64
 
 TAG="${1:-}"
 if [ -n "$TAG" ]; then
+  CODE_VERSION="$(grep -o 'current = "[0-9.]*"' "$ROOT/bridge/Sources/OrcaBridgeCore/OrcaVersion.swift" | grep -o '[0-9.]*')"
+  PLIST_VERSION="$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$ROOT/app/Info.plist")"
+  if [ "$TAG" != "v$CODE_VERSION" ] || [ "$TAG" != "v$PLIST_VERSION" ]; then
+    echo "error: tag $TAG != code v$CODE_VERSION / plist v$PLIST_VERSION — bump OrcaVersion.current and Info.plist first" >&2
+    exit 1
+  fi
+fi
+
+if [ -n "$TAG" ]; then
   if command -v gh >/dev/null 2>&1; then
     echo "==> Creating GitHub release $TAG..."
     gh release create "$TAG" "$DIST/Orca-arm64.tar.gz" "$DIST/Orca-x86_64.tar.gz" --title "$TAG" --generate-notes

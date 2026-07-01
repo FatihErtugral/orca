@@ -22,6 +22,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let focuser = TerminalFocuser()
     private let stateStore = AgentStateStore()
     private let titleRefresher = SessionTitleRefresher()
+    private let updateMonitor = UpdateMonitor()
 
     private var statusItem: NSStatusItem!
     private let popover = NSPopover()
@@ -34,6 +35,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         notifier.requestAuthorization()
         store.startPruning()
         titleRefresher.start(store: store)
+        updateMonitor.start()
 
         setupStatusItem()
         setupPopover()
@@ -79,6 +81,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             )
             .environmentObject(store)
             .environmentObject(preferencesStore)
+            .environmentObject(updateMonitor)
         )
     }
 

@@ -115,6 +115,18 @@ ab -- npm run build # any command
 **ollama** — automatic. The app polls `http://localhost:11434/api/ps` for running
 models.
 
+## Auto-update
+
+Orca checks for new releases at launch and every 6 hours (via your `gh` auth).
+When one is available the popover shows an **Update to vX.Y.Z** button — click it
+and Orca downloads the release for your CPU, replaces the app and CLI, and
+relaunches itself. You can also update from the terminal:
+
+```sh
+orca update            # update now
+orca update --check    # only report
+```
+
 ## Behavior notes
 
 - **Badge:** `running/open` — left is agents actively working, right is open

@@ -40,11 +40,6 @@ public final class AgentStore: ObservableObject {
         agents.reduce(0) { $0 + (($1.status == .done || $1.status == .idle) ? 0 : 1) }
     }
 
-    /// Whether any agent can be cleared by "Clear finished".
-    public var hasFinished: Bool {
-        agents.contains { $0.status == .done || $0.status == .idle || $0.status == .error }
-    }
-
     public func startPruning(interval: TimeInterval = 15) {
         pruneTimer?.invalidate()
         pruneTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
@@ -121,11 +116,6 @@ public final class AgentStore: ObservableObject {
             map.removeValue(forKey: stale)
         }
         ollamaIDs = current
-        publish()
-    }
-
-    public func clearFinished() {
-        map = map.filter { $0.value.status != .done && $0.value.status != .idle && $0.value.status != .error }
         publish()
     }
 

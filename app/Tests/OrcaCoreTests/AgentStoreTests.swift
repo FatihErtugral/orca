@@ -70,14 +70,6 @@ final class AgentStoreTests: XCTestCase {
         XCTAssertTrue(store.agents.isEmpty)
     }
 
-    func testHasFinished() {
-        let store = AgentStore(notifications: NotificationSpy())
-        store.apply(event("a", "running"))
-        XCTAssertFalse(store.hasFinished)
-        store.apply(event("b", "error"))
-        XCTAssertTrue(store.hasFinished)
-    }
-
     func testDisabledNotificationsSuppressAll() {
         let spy = NotificationSpy()
         let store = AgentStore(
