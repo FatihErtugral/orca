@@ -14,23 +14,8 @@ public final class AgentStore: ObservableObject {
     private let now: () -> Date
     private let doneGrace: TimeInterval
     private let staleTTL: TimeInterval
-    private let activity: TranscriptActivityTracking
     private let processAlive: (Int32) -> Bool
-    private let waitingConfirmDelay: TimeInterval
-    private let quietRevertDelay: TimeInterval
-    private let autoQuietDelay: TimeInterval
     private var pruneTimer: Timer?
-
-    /// Waiting notifications held back until the transcript stays quiet, so a
-    /// session that auto-resumes (background tasks, worktree agents) never
-    /// produces a false "your turn". Each entry records how much quiet it still
-    /// has to prove (a demote already proved a long quiet window).
-    private struct PendingNotice {
-        let since: Date
-        let requiredQuiet: TimeInterval
-    }
-
-    private var pendingWaiting: [String: PendingNotice] = [:]
 
     public init(
         notifications: NotificationScheduling,
@@ -38,31 +23,14 @@ public final class AgentStore: ObservableObject {
         now: @escaping () -> Date = Date.init,
         doneGrace: TimeInterval = 90,
         staleTTL: TimeInterval = 1800,
-        activity: TranscriptActivityTracking = TranscriptActivityMonitor(),
-        processAlive: @escaping (Int32) -> Bool = AgentStore.isProcessAlive,
-        waitingConfirmDelay: TimeInterval = 6,
-        quietRevertDelay: TimeInterval = 30,
-        autoQuietDelay: TimeInterval = 90
+        processAlive: @escaping (Int32) -> Bool = AgentStore.isProcessAlive
     ) {
         self.notifications = notifications
         self.preferences = preferences
         self.now = now
         self.doneGrace = doneGrace
         self.staleTTL = staleTTL
-        self.activity = activity
         self.processAlive = processAlive
-        self.waitingConfirmDelay = waitingConfirmDelay
-        self.quietRevertDelay = quietRevertDelay
-        self.autoQuietDelay = autoQuietDelay
-    }
-
-    /// Sessions that answer themselves (auto/bypass permission modes, or ones
-    /// observed auto-resuming) only notify after a long full quiet — the user
-    /// wants to hear from them when they are truly done, not between cycles.
-    private func confirmDelay(for agent: Agent) -> TimeInterval {
-        let selfPacingModes: Set<String> = ["auto", "bypassPermissions", "dontAsk"]
-        let selfPacing = agent.autoResumed || selfPacingModes.contains(agent.permissionMode ?? "")
-        return selfPacing ? autoQuietDelay : waitingConfirmDelay
     }
 
     public static func isProcessAlive(_ pid: Int32) -> Bool {
@@ -88,79 +56,22 @@ public final class AgentStore: ObservableObject {
         }
     }
 
-    /// Reconciles reported hook state with transcript ground truth, in BOTH
-    /// directions so the state always converges: activity promotes a "waiting"
-    /// session to running (auto-resume the hooks can't see), sustained quiet
-    /// demotes an activity-promoted session back to waiting (a late flush after
-    /// the stop must not latch it as running forever). Also removes agents whose
-    /// owning process died and releases debounced waiting notifications.
+    /// Removes agents whose owning process died. Status itself is exactly what
+    /// the hooks report — no inference.
     public func evaluateHealth() {
-        let currentTime = now()
         var changed = false
-
         for agent in map.values {
             if let pid = agent.pid, !processAlive(pid) {
                 map.removeValue(forKey: agent.id)
-                pendingWaiting.removeValue(forKey: agent.id)
-                changed = true
-                continue
-            }
-
-            guard let path = agent.transcriptPath else { continue }
-            let lastActivity = activity.lastMeaningfulActivity(path)
-
-            if agent.status == .waiting, let modified = lastActivity {
-                var revived = agent
-                revived.status = .running
-                revived.message = "Working…"
-                revived.revivedByActivity = true
-                revived.autoResumed = true
-                revived.runStartedAt = revived.runStartedAt ?? modified
-                revived.lastUpdate = currentTime
-                map[agent.id] = revived
-                pendingWaiting.removeValue(forKey: agent.id)
-                changed = true
-            } else if agent.status == .running, agent.revivedByActivity,
-                      let modified = lastActivity,
-                      currentTime.timeIntervalSince(modified) >= quietRevertDelay {
-                var demoted = agent
-                demoted.status = .waiting
-                demoted.message = "Waiting for you"
-                demoted.revivedByActivity = false
-                if let start = demoted.runStartedAt {
-                    demoted.lastRunDuration = modified.timeIntervalSince(start)
-                }
-                demoted.runStartedAt = nil
-                demoted.lastUpdate = currentTime
-                map[agent.id] = demoted
-                activity.rebaseline(path)
-                pendingWaiting[agent.id] = PendingNotice(since: currentTime, requiredQuiet: waitingConfirmDelay)
                 changed = true
             }
         }
-
-        for (id, notice) in pendingWaiting {
-            guard let agent = map[id], agent.status == .waiting else {
-                pendingWaiting.removeValue(forKey: id)
-                continue
-            }
-            guard currentTime.timeIntervalSince(notice.since) >= notice.requiredQuiet else { continue }
-            // The transcript was rebaselined when the stop arrived, so any
-            // meaningful record since then means Claude resumed — never notify.
-            let resumed = agent.transcriptPath.flatMap { activity.lastMeaningfulActivity($0) } != nil
-            if !resumed {
-                pendingWaiting.removeValue(forKey: id)
-                notify(agent)
-            }
-        }
-
         if changed { publish() }
     }
 
     public func apply(_ event: AgentEvent) {
         if event.status == "closed" || event.status == "ended" {
             map.removeValue(forKey: event.id)
-            pendingWaiting.removeValue(forKey: event.id)
             publish()
             return
         }
@@ -194,28 +105,14 @@ public final class AgentStore: ObservableObject {
         if let appBundleId = event.appBundleId { agent.appBundleId = appBundleId }
         if let transcriptPath = event.transcriptPath { agent.transcriptPath = transcriptPath }
         if let pid = event.pid { agent.pid = pid }
-        if let permissionMode = event.permissionMode { agent.permissionMode = permissionMode }
-        if status == .running { agent.autoResumed = false }
         agent.status = status
         agent.message = event.message
         agent.lastUpdate = timestamp
-        agent.revivedByActivity = false
 
         map[event.id] = agent
-
-        if status != .waiting { pendingWaiting.removeValue(forKey: event.id) }
         publish()
 
-        guard previous != status else { return }
-        // Waiting on a session with a transcript is only announced once no real
-        // work records follow the stop (see evaluateHealth) — Claude may
-        // auto-resume after background tasks.
-        if status == .waiting, let path = agent.transcriptPath {
-            activity.rebaseline(path)
-            pendingWaiting[event.id] = PendingNotice(since: timestamp, requiredQuiet: confirmDelay(for: agent))
-        } else {
-            notify(agent)
-        }
+        if previous != status { notify(agent) }
     }
 
     /// Update a title out-of-band (e.g. after a /rename is detected in the transcript).
@@ -247,7 +144,6 @@ public final class AgentStore: ObservableObject {
     /// Manually dismiss a single agent (e.g. a waiting session you're done with).
     public func remove(id: String) {
         map.removeValue(forKey: id)
-        pendingWaiting.removeValue(forKey: id)
         publish()
     }
 

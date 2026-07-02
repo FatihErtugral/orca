@@ -35,13 +35,6 @@ public struct Agent: Identifiable, Equatable {
     public var appBundleId: String?
     public var transcriptPath: String?
     public var pid: Int32?
-    /// True when health evaluation promoted this agent to running from transcript
-    /// activity (not from a hook); such agents demote back once activity stops.
-    public var revivedByActivity: Bool = false
-    /// Set once the session is seen resuming without a user prompt; cleared by
-    /// any hook-reported running. Such sessions notify only after long quiet.
-    public var autoResumed: Bool = false
-    public var permissionMode: String?
 
     public init(
         id: String,
